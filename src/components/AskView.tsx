@@ -217,8 +217,32 @@ export function AskView({
         </p>
       )}
       {error && <p className="rounded-xl border border-bad/50 bg-bad/10 p-3 text-sm">{error}</p>}
+      {/* Always mounted so the audio element exists before the first click (autoplay unlock). */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-40 border-t border-line bg-panel/95 px-4 py-2 backdrop-blur transition ${voice.current ? "translate-y-0" : "pointer-events-none translate-y-full opacity-0"}`}
+      >
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          {voice.current && voice.current.voice !== "narrator" ? (
+            <AgentAvatar agent={voice.current.voice} size={30} active={voice.playingId !== null} />
+          ) : (
+            <Headphones size={20} className="text-ink-2" />
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-semibold">
+              {voice.loadingId ? "Preparing voice… " : "Now speaking: "}
+              {voice.current ? (voice.current.voice === "narrator" ? "TrustLens narrator" : `${AGENT_META[voice.current.voice].name}, ${AGENT_META[voice.current.voice].role}`) : ""}
+            </div>
+            <div className="truncate text-[11px] text-ink-3">{voice.current?.text}</div>
+          </div>
+          <audio ref={voice.bindAudio} controls className="h-9 w-72 max-w-[45%]" />
+          <button onClick={voice.stop} className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 hover:bg-white/5">
+            Stop
+          </button>
+        </div>
+      </div>
+
       {voice.error && (
-        <p role="alert" className="fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border border-warn/50 bg-panel-2 p-3 text-sm text-ink-2 shadow-2xl">
+        <p role="alert" className="fixed bottom-20 right-4 z-50 max-w-sm rounded-xl border border-warn/50 bg-panel-2 p-3 text-sm text-ink-2 shadow-2xl">
           🔇 {voice.error}
         </p>
       )}

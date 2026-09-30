@@ -38,6 +38,7 @@ export function useVoice(language = "en") {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [current, setCurrent] = useState<SpeakItem | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const urls = useRef<string[]>([]);
@@ -49,6 +50,12 @@ export function useVoice(language = "en") {
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     setPlayingId(null);
     setLoadingId(null);
+    setCurrent(null);
+  }, []);
+
+  /** Attach to a visible <audio controls> element so users can press play if autoplay is blocked. */
+  const bindAudio = useCallback((el: HTMLAudioElement | null) => {
+    if (el) audioRef.current = el;
   }, []);
 
   useEffect(
@@ -91,12 +98,15 @@ export function useVoice(language = "en") {
       el.src = url;
       el.play().catch((e: unknown) => {
         const name = e instanceof DOMException ? e.name : "";
+        if (name === "NotAllowedError") {
+          // Keep the line loaded; the visible player lets the user start it manually.
+          el.onplay = () => setError(null);
+        } else resolve(false);
         setError(
           name === "NotAllowedError"
-            ? "Your browser blocked audio. Allow sound for localhost (site settings) and click Listen again."
+            ? "Your browser blocked auto-play. Press ▶ on the player below, or allow audio for localhost in the address bar."
             : "Could not play audio in this browser.",
         );
-        resolve(false);
       });
     });
 
@@ -114,6 +124,7 @@ export function useVoice(language = "en") {
         if (signal.aborted) return;
         const item = items[i];
         setLoadingId(item.id);
+        setCurrent(item);
         const url = await next;
         // Prefetch the following line while this one plays.
         next = items[i + 1] ? fetchAudio(items[i + 1], signal).catch(() => null) : null;
@@ -129,6 +140,7 @@ export function useVoice(language = "en") {
       }
       if (!signal.aborted) {
         setPlayingId(null);
+        setCurrent(null);
         abortRef.current = null;
       }
     },
@@ -136,5 +148,5 @@ export function useVoice(language = "en") {
     [stop, language],
   );
 
-  return { speak, stop, playingId, loadingId, error, busy: playingId !== null || loadingId !== null };
+  return { speak, stop, bindAudio, current, playingId, loadingId, error, busy: playingId !== null || loadingId !== null };
 }
