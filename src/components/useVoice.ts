@@ -1,6 +1,5 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { diag } from "./diag";
 
 export type VoiceName = "narrator" | "scout" | "critic" | "arbiter";
 export interface SpeakItem {
@@ -30,13 +29,8 @@ async function fetchAudio(item: SpeakItem, signal: AbortSignal): Promise<string 
     body: JSON.stringify({ text: item.text, voice: item.voice }),
     signal,
   });
-  if (!res.ok) {
-    diag("tts-failed", `status=${res.status}`);
-    return null;
-  }
-  const blob = await res.blob();
-  diag("tts-ok", `bytes=${blob.size} type=${blob.type}`);
-  return URL.createObjectURL(blob);
+  if (!res.ok) return null;
+  return URL.createObjectURL(await res.blob());
 }
 
 /** Plays a queue of lines one after another, exposing which line is currently speaking. */
@@ -98,21 +92,12 @@ export function useVoice(language = "en") {
     new Promise<boolean>((resolve) => {
       const el = audioRef.current ?? new Audio();
       audioRef.current = el;
-      el.onended = () => {
-        diag("audio-ended", `t=${el.currentTime.toFixed(1)} muted=${el.muted} vol=${el.volume}`);
-        resolve(true);
-      };
-      el.onerror = () => {
-        diag("audio-error", `code=${el.error?.code} msg=${el.error?.message}`);
-        resolve(false);
-      };
+      el.onended = () => resolve(true);
+      el.onerror = () => resolve(false);
       signal.addEventListener("abort", () => resolve(true));
       el.src = url;
-      el.play()
-        .then(() => diag("audio-playing", `muted=${el.muted} vol=${el.volume} dur=${el.duration}`))
-        .catch((e: unknown) => {
+      el.play().catch((e: unknown) => {
         const name = e instanceof DOMException ? e.name : "";
-        diag("audio-play-rejected", `${name}: ${e instanceof Error ? e.message : e}`);
         if (name === "NotAllowedError") {
           // Keep the line loaded; the visible player lets the user start it manually.
           el.onplay = () => setError(null);

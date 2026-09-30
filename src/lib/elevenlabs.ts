@@ -65,13 +65,3 @@ export async function textToDialogue(lines: { text: string; voice: VoiceKey }[])
   remember(key, audio);
   return audio;
 }
-
-export async function speechToText(audio: Blob): Promise<string> {
-  const form = new FormData();
-  form.append("file", audio, "question.webm");
-  form.append("model_id", process.env.ELEVENLABS_STT_MODEL ?? "scribe_v1");
-  const res = await fetch(`${API}/speech-to-text`, { method: "POST", headers: headers(), body: form });
-  if (!res.ok) throw new Error(`ElevenLabs STT failed (${res.status})`);
-  const data = (await res.json()) as { text?: string };
-  return (data.text ?? "").trim();
-}
