@@ -1,0 +1,43 @@
+import "server-only";
+import { GoogleGenAI } from "@google/genai";
+
+let client: GoogleGenAI | null | undefined;
+
+function getClient(): GoogleGenAI | null {
+  if (client !== undefined) return client;
+  if (process.env.GEMINI_API_KEY) {
+    client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  } else if (process.env.GOOGLE_CLOUD_PROJECT) {
+    // Vertex AI on the hackathon Google Cloud project (uses Application Default Credentials).
+    client = new GoogleGenAI({
+      vertexai: true,
+      project: process.env.GOOGLE_CLOUD_PROJECT,
+      location: process.env.GOOGLE_CLOUD_LOCATION ?? "europe-west1",
+    });
+  } else {
+    client = null;
+  }
+  return client;
+}
+
+export function geminiEnabled() {
+  return getClient() !== null;
+}
+
+export async function generateJson<T>(system: string, prompt: string, schema: object): Promise<T> {
+  const ai = getClient();
+  if (!ai) throw new Error("Gemini is not configured");
+  const res = await ai.models.generateContent({
+    model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+    contents: prompt,
+    config: {
+      systemInstruction: system,
+      responseMimeType: "application/json",
+      responseJsonSchema: schema,
+      temperature: 0.6,
+    },
+  });
+  const text = res.text;
+  if (!text) throw new Error("Empty response from Gemini");
+  return JSON.parse(text) as T;
+}

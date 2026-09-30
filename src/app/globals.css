@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0c11;
+  --panel: #12151c;
+  --panel-2: #181c25;
+  --line: #252a36;
+  --ink: #f4f5f7;
+  --ink-2: #b8bcc8;
+  --ink-3: #7c8293;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --serious: #ec835a;
+  --bad: #d03b3b;
+  --scout: #38bdf8;
+  --critic: #fb923c;
+  --arbiter: #a78bfa;
+  --brand: #3987e5;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-serious: var(--serious);
+  --color-bad: var(--bad);
+  --color-scout: var(--scout);
+  --color-critic: var(--critic);
+  --color-arbiter: var(--arbiter);
+  --color-brand: var(--brand);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.glow-bg {
+  background:
+    radial-gradient(900px 500px at 10% -10%, rgba(57, 135, 229, 0.16), transparent 60%),
+    radial-gradient(700px 400px at 100% 0%, rgba(167, 139, 250, 0.12), transparent 60%),
+    var(--bg);
+}
+
+.brand-bars {
+  background: linear-gradient(90deg, #f7a41d 0 25%, #e8423f 25% 50%, #3987e5 50% 75%, #36b37e 75% 100%);
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.eq span {
+  display: inline-block;
+  width: 3px;
+  margin: 0 1px;
+  border-radius: 2px;
+  background: currentColor;
+  animation: eq 0.9s ease-in-out infinite;
+}
+.eq span:nth-child(2) { animation-delay: 0.15s; }
+.eq span:nth-child(3) { animation-delay: 0.3s; }
+.eq span:nth-child(4) { animation-delay: 0.45s; }
+@keyframes eq {
+  0%, 100% { height: 4px; }
+  50% { height: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer, .eq span { animation: none; }
+}
