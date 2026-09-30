@@ -38,7 +38,7 @@ Organisation-wide view of contradictions, outdated and unvalidated knowledge, an
 
 ## Tech stack
 - **Next.js 15** (App Router, TypeScript), Tailwind CSS 4, Framer Motion
-- **Gemini** (Google AI Studio key or **Vertex AI on Google Cloud**) for the three agents, with JSON-schema structured output
+- **Gemini on Vertex AI (Google Cloud)**, authenticated with Application Default Credentials (no API keys), for the three agents, with JSON-schema structured output
 - **ElevenLabs**: text-to-speech, text-to-dialogue (v3), speech-to-text (Scribe)
 - Deterministic trust engine (`src/lib/trust.ts`) plus a file-backed store for captured knowledge
 
@@ -64,7 +64,7 @@ Sign in with a demo account (the password is your `DEMO_PASSWORD`):
 - `pieter@sdworx.demo`: consultant (other portfolio, used to show access isolation)
 - `sarah@sdworx.demo`, `marc@sdworx.demo`, `ines@sdworx.demo`: experts
 
-**Without API keys it still works:** built-in demo agents and browser speech take over. Add `GEMINI_API_KEY` (or `GOOGLE_CLOUD_PROJECT` for Vertex AI) and `ELEVENLABS_API_KEY` for the full experience.
+**Without API keys it still works:** built-in demo agents and browser speech take over. For live agents, sign in once with `gcloud auth application-default login`, then set `GOOGLE_CLOUD_PROJECT`. Add `ELEVENLABS_API_KEY` for real voices.
 
 ### Demo script
 1. As Lotte, ask *"An employee at De Klok resigned in August. Do they still get a year-end bonus?"*. It finds 6 sources, sets aside the outdated 2021 rule, the Teams rumour, the Dutch and construction documents, and returns **Use with caution** with a gap.
