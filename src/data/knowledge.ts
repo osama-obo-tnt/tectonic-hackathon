@@ -460,7 +460,7 @@ export const sources: Source[] = [
   },
 ];
 
-// Polished answers used by the demo engine when no Gemini key is configured.
+// Polished answers used by the demo engine when no Anthropic API key is configured.
 export const demoAnswers: Record<string, (client: Client) => string> = {
   "year-end-bonus": (c) =>
     `Yes, most likely. Under the current PC 200 procedure (v2026), an employee who resigns keeps a pro-rata year-end bonus if they have at least 6 months of seniority. Pay it with the final pay, based on the last full monthly salary. Ignore the 2021 rule and the Teams advice that resignations get nothing: both are outdated or unverified. Before you pay, confirm with the expert whether ${c.name}'s own company agreement changes this.`,

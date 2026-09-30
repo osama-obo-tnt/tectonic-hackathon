@@ -38,7 +38,7 @@ Organisation-wide view of contradictions, outdated and unvalidated knowledge, an
 
 ## Tech stack
 - **Next.js 15** (App Router, TypeScript), Tailwind CSS 4, Framer Motion
-- **Gemini on Vertex AI (Google Cloud)**, authenticated with Application Default Credentials (no API keys), for the three agents, with JSON-schema structured output
+- **Claude (`claude-opus-5`, Anthropic SDK)** for the three agents, with Zod-validated structured outputs
 - **ElevenLabs**: text-to-speech, text-to-dialogue (v3), speech-to-text (Scribe)
 - Deterministic trust engine (`src/lib/trust.ts`) plus a file-backed store for captured knowledge
 
@@ -46,7 +46,7 @@ Organisation-wide view of contradictions, outdated and unvalidated knowledge, an
 src/
   data/knowledge.ts     fictional SD Worx knowledge base (sources, clients, experts)
   lib/trust.ts          retrieval, trust signals, conflicts, gaps, expert routing
-  lib/agents.ts         Scout → Critic → Scout rebuttal → Arbiter pipeline (Gemini + demo fallback)
+  lib/agents.ts         Scout → Critic → Scout rebuttal → Arbiter pipeline (Claude + demo fallback)
   lib/elevenlabs.ts     TTS, dialogue, STT
   lib/auth.ts, session.ts, middleware.ts   authentication & authorization
   app/api/*             ask (streaming), tts, dialogue, stt, questions, auth
@@ -64,7 +64,7 @@ Sign in with a demo account (the password is your `DEMO_PASSWORD`):
 - `pieter@sdworx.demo`: consultant (other portfolio, used to show access isolation)
 - `sarah@sdworx.demo`, `marc@sdworx.demo`, `ines@sdworx.demo`: experts
 
-**Without API keys it still works:** built-in demo agents and browser speech take over. For live agents, sign in once with `gcloud auth application-default login`, then set `GOOGLE_CLOUD_PROJECT`. Add `ELEVENLABS_API_KEY` for real voices.
+**Without API keys it still works:** built-in demo agents and browser speech take over. Add `ANTHROPIC_API_KEY` for live Claude agents and `ELEVENLABS_API_KEY` for real voices.
 
 ### Demo script
 1. As Lotte, ask *"An employee at De Klok resigned in August. Do they still get a year-end bonus?"*. It finds 6 sources, sets aside the outdated 2021 rule, the Teams rumour, the Dutch and construction documents, and returns **Use with caution** with a gap.

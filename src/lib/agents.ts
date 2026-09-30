@@ -1,6 +1,7 @@
 import "server-only";
 import { demoAnswers, topicLabels } from "@/data/knowledge";
-import { generateJson, geminiEnabled, pauseGemini } from "./gemini";
+import { z } from "zod";
+import { generateJson, llmEnabled, pauseLlm } from "./llm";
 import { sourcesForUser } from "./store";
 import { detectConflicts, detectGaps, overallTrust, retrieve, scoreSource, suggestExpert } from "./trust";
 import type { AskEvent, AskResult, Client, Conflict, Language, ScoredSource, Turn, User } from "./types";
@@ -13,26 +14,16 @@ export const AGENTS = {
 
 const LANG_NAME: Record<Language, string> = { en: "English", nl: "Dutch (Flemish)", fr: "French" };
 
-const turnSchema = {
-  type: "object",
-  properties: {
-    spoken: { type: "string", description: "What the agent says out loud: 2-4 natural, conversational sentences." },
-    points: { type: "array", items: { type: "string" }, description: "2-4 short bullet points backing up what was said." },
-    sourceIds: { type: "array", items: { type: "string" } },
-  },
-  required: ["spoken", "points", "sourceIds"],
-};
+const turnSchema = z.object({
+  spoken: z.string().describe("What the agent says out loud: 2-4 natural, conversational sentences."),
+  points: z.array(z.string()).describe("2-4 short bullet points backing up what was said."),
+  sourceIds: z.array(z.string()).describe("Ids of the sources this turn refers to."),
+});
 
-const arbiterSchema = {
-  type: "object",
-  properties: {
-    ...turnSchema.properties,
-    finalAnswer: { type: "string", description: "The answer for the consultant: 2-4 clear, actionable sentences including caveats." },
-  },
-  required: ["spoken", "points", "sourceIds", "finalAnswer"],
-};
+const arbiterSchema = turnSchema.extend({
+  finalAnswer: z.string().describe("The answer for the consultant: 2-4 clear, actionable sentences including caveats."),
+});
 
-type LlmTurn = { spoken: string; points: string[]; sourceIds: string[] };
 
 function describeSources(scored: ScoredSource[]) {
   return scored
@@ -228,7 +219,7 @@ export async function runPipeline(
   let answer = "";
   let engine: AskResult["engine"] = "demo";
 
-  if (geminiEnabled() && scored.length) {
+  if (llmEnabled() && scored.length) {
     try {
       const facts = `${context(question, client)}
 
@@ -241,7 +232,7 @@ ${describeConflicts(conflicts)}
 Known gaps: ${gaps.length ? gaps.join(" | ") : "none"}`;
 
       emit({ type: "stage", stage: "scout" });
-      const scout = await generateJson<LlmTurn>(
+      const scout = await generateJson(
         system("scout", language),
         `${facts}\n\nPresent what you found to Rex and Sage: the strongest evidence and a draft answer. Be honest if sources disagree.`,
         turnSchema,
@@ -250,7 +241,7 @@ Known gaps: ${gaps.length ? gaps.join(" | ") : "none"}`;
       emit({ type: "turn", turn: t1 });
 
       emit({ type: "stage", stage: "critic" });
-      const critic = await generateJson<LlmTurn>(
+      const critic = await generateJson(
         system("critic", language),
         `${facts}\n\nNova said: "${scout.spoken}"\n\nChallenge Nova. Point out outdated, superseded, ownerless, informal or out-of-scope sources, conflicts and gaps. Be sharp but fair.`,
         turnSchema,
@@ -259,7 +250,7 @@ Known gaps: ${gaps.length ? gaps.join(" | ") : "none"}`;
       emit({ type: "turn", turn: t2 });
 
       emit({ type: "stage", stage: "rebuttal" });
-      const rebuttal = await generateJson<LlmTurn>(
+      const rebuttal = await generateJson(
         system("scout", language),
         `${facts}\n\nYou said: "${scout.spoken}"\nRex replied: "${critic.spoken}"\n\nRespond to Rex in 2-3 sentences: concede what is right, defend what still holds.`,
         turnSchema,
@@ -268,7 +259,7 @@ Known gaps: ${gaps.length ? gaps.join(" | ") : "none"}`;
       emit({ type: "turn", turn: t3 });
 
       emit({ type: "stage", stage: "arbiter" });
-      const arbiter = await generateJson<LlmTurn & { finalAnswer: string }>(
+      const arbiter = await generateJson(
         system("arbiter", language),
         `${facts}\n\nDebate so far:\nNova: "${scout.spoken}"\nRex: "${critic.spoken}"\nNova: "${rebuttal.spoken}"\n\nThe trust engine rates the answer ${trust.score}/100 (${trust.verdict}), relying on: ${
           trusted.map((t) => t.source.title).join("; ") || "no source"
@@ -280,10 +271,10 @@ Known gaps: ${gaps.length ? gaps.join(" | ") : "none"}`;
 
       turns = [t1, t2, t3, t4];
       answer = arbiter.finalAnswer;
-      engine = "gemini";
+      engine = "claude";
     } catch (err) {
-      console.error("Gemini pipeline failed, falling back to demo engine:", err instanceof Error ? err.message.slice(0, 300) : err);
-      pauseGemini();
+      console.error("Claude pipeline failed, falling back to demo engine:", err instanceof Error ? err.message.slice(0, 300) : err);
+      pauseLlm();
       turns = [];
     }
   }

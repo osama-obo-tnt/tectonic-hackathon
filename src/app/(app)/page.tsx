@@ -2,7 +2,7 @@ import { AskView } from "@/components/AskView";
 import { demoQuestions } from "@/data/knowledge";
 import { requirePageUser } from "@/lib/auth";
 import { elevenEnabled } from "@/lib/elevenlabs";
-import { geminiEnabled } from "@/lib/gemini";
+import { llmEnabled } from "@/lib/llm";
 import { clientsForUser } from "@/lib/store";
 
 export default async function AskPage() {
@@ -19,7 +19,7 @@ export default async function AskPage() {
           TrustLens searches every knowledge source, lets three AI agents debate what holds up, and shows you exactly why you can (or can&apos;t) rely on it.
         </p>
       </header>
-      <AskView clients={clients} examples={examples} voiceEnabled={elevenEnabled()} engine={geminiEnabled() ? "gemini" : "demo"} />
+      <AskView clients={clients} examples={examples} voiceEnabled={elevenEnabled()} engine={llmEnabled() ? "claude" : "demo"} />
     </div>
   );
 }

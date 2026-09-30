@@ -30,7 +30,7 @@ export function AskView({
   clients: Client[];
   examples: { clientId: string; question: string }[];
   voiceEnabled: boolean;
-  engine: "gemini" | "demo";
+  engine: "claude" | "demo";
 }) {
   const [clientId, setClientId] = useState(clients[0]?.id ?? "");
   const [language, setLanguage] = useState<Language>("en");
@@ -288,7 +288,7 @@ export function AskView({
               )}
               <ExpertCard key={result.question + result.clientId} result={result} />
               <div className="rounded-2xl border border-line bg-panel p-4 text-xs text-ink-3">
-                Engine: <span className="text-ink-2">{result.engine === "gemini" ? "Gemini agents (Google Cloud)" : "Built-in demo agents"}</span>
+                Engine: <span className="text-ink-2">{result.engine === "claude" ? "Claude agents (Anthropic)" : "Built-in demo agents"}</span>
                 <br />
                 Voice: <span className="text-ink-2">{voiceEnabled ? "ElevenLabs" : "Browser fallback"}</span>
               </div>
@@ -315,7 +315,7 @@ export function AskView({
             </motion.div>
           ))}
           <p className="text-xs text-ink-3 sm:col-span-3">
-            {engine === "gemini" ? "Agents are powered by Gemini." : "Running built-in demo agents. Add a Gemini key for live reasoning."}{" "}
+            {engine === "claude" ? "Agents are powered by Claude." : "Running built-in demo agents. Add an Anthropic API key for live reasoning."}{" "}
             {voiceEnabled ? "Voices are powered by ElevenLabs." : "Add an ElevenLabs key for real agent voices."}
           </p>
         </div>

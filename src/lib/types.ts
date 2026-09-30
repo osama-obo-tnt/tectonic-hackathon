@@ -127,7 +127,7 @@ export interface AskResult {
   gaps: string[];
   expert: ExpertSuggestion | null;
   turns: Turn[];
-  engine: "gemini" | "demo";
+  engine: "claude" | "demo";
 }
 
 export type AskEvent =
