@@ -116,6 +116,7 @@ export interface ExpertSuggestion {
 export interface AskResult {
   question: string;
   clientId: string;
+  language: Language;
   topic: string | null;
   answer: string;
   verdict: "trusted" | "caution" | "expert";

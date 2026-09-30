@@ -298,6 +298,7 @@ Confirmed by ${captured.source.author} (expert answer, ${captured.source.updated
   const result: AskResult = {
     question,
     clientId: client.id,
+    language,
     topic,
     answer,
     verdict: trust.verdict,

@@ -2,7 +2,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, ChevronDown, FileText, GitCompareArrows, Headphones, Loader2, Pause, SearchX, Sparkles } from "lucide-react";
 import { useRef, useState } from "react";
-import { AGENT_META, STAGE_TEXT } from "@/lib/agentMeta";
+import { AGENT_META } from "@/lib/agentMeta";
+import { translator, type I18nKey, type T } from "@/lib/i18n";
 import type { AgentId, AskEvent, AskResult, Client, Conflict, Language, ScoredSource, Turn } from "@/lib/types";
 import { AgentAvatar, SignalChip, TrustGauge, VERDICT } from "./bits";
 import { DebatePanel } from "./DebatePanel";
@@ -10,37 +11,30 @@ import { ExpertCard } from "./ExpertCard";
 import { useVoice } from "./useVoice";
 import { VoiceInput } from "./VoiceInput";
 
-const TYPE_LABEL: Record<string, string> = {
-  procedure: "Procedure",
-  policy: "Policy",
-  faq: "FAQ",
-  checklist: "Checklist",
-  teams: "Teams chat",
-  email: "Email",
-  handover: "Handover note",
-  "expert-answer": "Expert answer",
-};
-
 export function AskView({
   clients,
   examples,
   voiceEnabled,
   engine,
+  initial,
 }: {
   clients: Client[];
   examples: { clientId: string; question: string }[];
   voiceEnabled: boolean;
   engine: "claude" | "demo";
+  initial: AskResult | null; // the user's latest analysis, kept until the next search
 }) {
-  const [clientId, setClientId] = useState(clients[0]?.id ?? "");
-  const [language, setLanguage] = useState<Language>("en");
-  const [question, setQuestion] = useState("");
-  const [stage, setStage] = useState<string | null>(null);
-  const [sources, setSources] = useState<ScoredSource[]>([]);
-  const [conflicts, setConflicts] = useState<Conflict[]>([]);
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [result, setResult] = useState<AskResult | null>(null);
+  const [clientId, setClientId] = useState(initial?.clientId ?? clients[0]?.id ?? "");
+  const [language, setLanguage] = useState<Language>(initial?.language ?? "en");
+  const [question, setQuestion] = useState(initial?.question ?? "");
+  const [stage, setStage] = useState<string | null>(initial ? "done" : null);
+  const [sources, setSources] = useState<ScoredSource[]>(initial?.sources ?? []);
+  const [conflicts, setConflicts] = useState<Conflict[]>(initial?.conflicts ?? []);
+  const [turns, setTurns] = useState<Turn[]>(initial?.turns ?? []);
+  const [result, setResult] = useState<AskResult | null>(initial);
   const [error, setError] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const t = translator(language);
   const [showReasoning, setShowReasoning] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const voice = useVoice(language);
@@ -86,13 +80,37 @@ export function AskView({
             setSources(e.sources);
             setConflicts(e.conflicts);
           } else if (e.type === "turn") setTurns((t) => [...t, e.turn]);
-          else if (e.type === "result") setResult(e.result);
+          else if (e.type === "result") showResult(e.result);
           else if (e.type === "error") setError(e.message);
         }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     }
+  }
+
+  function showResult(r: AskResult) {
+    setResult(r);
+    setTurns(r.turns);
+    setSources(r.sources);
+    setConflicts(r.conflicts);
+  }
+
+  /** Switching language translates the current result in place (answer, debate, labels). */
+  async function changeLanguage(lang: Language) {
+    setLanguage(lang);
+    if (!result || running || result.language === lang) return;
+    voice.stop();
+    setTranslating(true);
+    setError(null);
+    const res = await fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language: lang }),
+    }).catch(() => null);
+    if (res?.ok) showResult(((await res.json()) as { result: AskResult }).result);
+    else setError(res?.status === 503 ? "Translation needs the Claude agents to be configured." : "Translation failed. Please try again.");
+    setTranslating(false);
   }
 
   function openReasoning() {
@@ -130,12 +148,13 @@ export function AskView({
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value.slice(0, 500))}
-          placeholder="Ask a question…"
+          placeholder={t("placeholder")}
           className="h-11 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-ink-3"
         />
         <select
           value={language}
-          onChange={(e) => setLanguage(e.target.value as Language)}
+          onChange={(e) => changeLanguage(e.target.value as Language)}
+          disabled={translating}
           className="h-11 rounded-xl bg-transparent px-1 text-xs text-ink-3 outline-none"
           aria-label="Answer language"
         >
@@ -155,7 +174,7 @@ export function AskView({
 
       {!stage && examples.length > 0 && (
         <div className="space-y-1.5 pl-1">
-          <p className="text-xs text-ink-3">Try one of these:</p>
+          <p className="text-xs text-ink-3">{t("try")}</p>
           {examples.map((ex) => (
             <button key={ex.question} onClick={() => ask(ex.question, ex.clientId)} className="block text-left text-sm text-ink-2 transition hover:text-ink">
               → {ex.question} <span className="text-xs text-ink-3">· {clients.find((c) => c.id === ex.clientId)?.name}</span>
@@ -179,7 +198,7 @@ export function AskView({
             ))}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-ink">{STAGE_TEXT[stage!]}</p>
+            <p className="text-sm text-ink">{t(`stage.${stage}` as I18nKey)}</p>
             {lastTurn && (
               <p className="mt-0.5 truncate text-xs text-ink-3">
                 {AGENT_META[lastTurn.agent].name}: “{lastTurn.text}”
@@ -190,16 +209,22 @@ export function AskView({
         </motion.div>
       )}
       {error && <p className="rounded-xl border border-bad/50 bg-bad/10 p-3 text-sm">{error}</p>}
+      {translating && (
+        <p className="flex items-center gap-2 pl-1 text-sm text-ink-3">
+          <Loader2 size={14} className="animate-spin" /> {t("translating")}
+        </p>
+      )}
 
       {/* ─── Result ─── */}
       <AnimatePresence>
         {result && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className={`space-y-4 transition-opacity ${translating ? "opacity-40" : ""}`}>
             <AnswerCard
               result={result}
               playing={answerPlaying}
               onListen={() => (answerPlaying ? voice.stop() : voice.speak([{ id: "answer", text: result.answer, voice: "narrator" }]))}
               onReasoning={openReasoning}
+              t={t}
             />
 
             {result.verdict !== "trusted" && result.expert && (
@@ -207,7 +232,7 @@ export function AskView({
                 {result.gaps.length > 0 && (
                   <div className="rounded-2xl border border-warn/40 bg-warn/5 p-4">
                     <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-warn">
-                      <SearchX size={14} /> Knowledge gap
+                      <SearchX size={14} /> {t("gap")}
                     </div>
                     {result.gaps.map((g) => (
                       <p key={g} className="text-sm text-ink-2">
@@ -216,7 +241,7 @@ export function AskView({
                     ))}
                   </div>
                 )}
-                <ExpertCard key={result.question + result.clientId} result={result} />
+                <ExpertCard key={result.question + result.clientId} result={result} t={t} />
               </div>
             )}
 
@@ -231,25 +256,25 @@ export function AskView({
                   ))}
                 </div>
               }
-              title="Why is this reliable?"
-              subtitle="Read or listen to Nova, Rex and Sage debate it"
+              title={t("whyTitle")}
+              subtitle={t("whySub")}
             >
               <p className="mb-4 text-xs text-ink-3">
-                {result.scoreExplanation.join(" ")} Score = scope 35% · freshness 25% · validation 25% · ownership 15%, computed from the sources, not by the AI.
+                {result.scoreExplanation.join(" ")} {t("scoreNote")}
               </p>
-              <DebatePanel turns={result.turns} sources={result.sources} voice={voice} voiceEnabled={voiceEnabled} />
+              <DebatePanel turns={result.turns} sources={result.sources} voice={voice} voiceEnabled={voiceEnabled} t={t} />
             </Section>
 
             <Section
               open={showDetails}
               onToggle={() => setShowDetails((s) => !s)}
               icon={<FileText size={18} className="text-ink-3" />}
-              title={`${sources.length} sources checked · ${result.trustedSourceIds.length} trusted`}
-              subtitle={conflicts.length ? `${conflicts.length} conflict${conflicts.length > 1 ? "s" : ""} resolved` : "No conflicts"}
+              title={t("sourcesChecked", { n: sources.length, m: result.trustedSourceIds.length })}
+              subtitle={conflicts.length ? t("conflictsResolved", { n: conflicts.length }) : t("noConflicts")}
             >
               <div className="space-y-4">
-                {conflicts.length > 0 && <ConflictsCard conflicts={conflicts} sources={sources} />}
-                <SourcesCard sources={sources} trusted={result.trustedSourceIds} />
+                {conflicts.length > 0 && <ConflictsCard conflicts={conflicts} sources={sources} t={t} />}
+                <SourcesCard sources={sources} trusted={result.trustedSourceIds} t={t} />
               </div>
             </Section>
           </motion.div>
@@ -268,14 +293,14 @@ export function AskView({
           )}
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold">
-              {voice.loadingId ? "Preparing voice… " : "Now speaking: "}
-              {voice.current ? (voice.current.voice === "narrator" ? "TrustLens narrator" : `${AGENT_META[voice.current.voice].name}, ${AGENT_META[voice.current.voice].role}`) : ""}
+              {voice.loadingId ? t("preparingVoice") : t("nowSpeaking")}{" "}
+              {voice.current ? (voice.current.voice === "narrator" ? t("narrator") : `${AGENT_META[voice.current.voice].name}, ${t(`role.${voice.current.voice}`)}`) : ""}
             </div>
             <div className="truncate text-[11px] text-ink-3">{voice.current?.text}</div>
           </div>
           <audio ref={voice.bindAudio} controls className="h-9 w-72 max-w-[45%]" />
           <button onClick={voice.stop} className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 hover:bg-white/5">
-            Stop
+            {t("stop")}
           </button>
         </div>
       </div>
@@ -332,11 +357,13 @@ function AnswerCard({
   playing,
   onListen,
   onReasoning,
+  t,
 }: {
   result: AskResult;
   playing: boolean;
   onListen: () => void;
   onReasoning: () => void;
+  t: T;
 }) {
   const v = VERDICT[result.verdict];
   return (
@@ -351,16 +378,16 @@ function AnswerCard({
             style={{ background: `color-mix(in srgb, ${v.color} 18%, transparent)`, color: v.color }}
             title="Show the full chain of reasoning"
           >
-            <v.Icon size={16} /> {v.label}
-            <span className="text-xs font-normal text-ink-2 group-hover:underline">· see why</span>
+            <v.Icon size={16} /> {t(`verdict.${result.verdict}`)}
+            <span className="text-xs font-normal text-ink-2 group-hover:underline">· {t("seeWhy")}</span>
             <ArrowRight size={14} className="transition group-hover:translate-x-0.5" />
           </button>
           <p className="whitespace-pre-line text-[15px] leading-relaxed">{result.answer}</p>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button onClick={onListen} className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15">
-              {playing ? <Pause size={14} /> : <Headphones size={14} />} {playing ? "Stop" : "Listen"}
+              {playing ? <Pause size={14} /> : <Headphones size={14} />} {playing ? t("stop") : t("listen")}
             </button>
-            <span className="text-xs text-ink-3">{v.sub}</span>
+            <span className="text-xs text-ink-3">{t(`verdictSub.${result.verdict}`)}</span>
           </div>
         </div>
       </div>
@@ -368,12 +395,12 @@ function AnswerCard({
   );
 }
 
-function ConflictsCard({ conflicts, sources }: { conflicts: Conflict[]; sources: ScoredSource[] }) {
+function ConflictsCard({ conflicts, sources, t }: { conflicts: Conflict[]; sources: ScoredSource[]; t: T }) {
   const title = (id: string) => sources.find((s) => s.source.id === id)?.source.title ?? id;
   return (
     <div className="rounded-2xl border border-serious/40 bg-panel p-4">
       <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-serious">
-        <GitCompareArrows size={14} /> {conflicts.length} conflict{conflicts.length > 1 ? "s" : ""} detected
+        <GitCompareArrows size={14} /> {t("conflictsDetected", { n: conflicts.length })}
       </div>
       <div className="space-y-4">
         {conflicts.map((c) => (
@@ -389,7 +416,7 @@ function ConflictsCard({ conflicts, sources }: { conflicts: Conflict[]; sources:
                       <div className={win ? "text-ink" : "text-ink-3 line-through decoration-ink-3/50"}>{p.value}</div>
                       <div className="truncate text-[11px] text-ink-3">{title(p.sourceId)}</div>
                     </div>
-                    {win && <span className="rounded bg-good/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-good">wins</span>}
+                    {win && <span className="rounded bg-good/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-good">{t("wins")}</span>}
                   </div>
                 );
               })}
@@ -401,12 +428,12 @@ function ConflictsCard({ conflicts, sources }: { conflicts: Conflict[]; sources:
   );
 }
 
-function SourcesCard({ sources, trusted }: { sources: ScoredSource[]; trusted: string[] }) {
+function SourcesCard({ sources, trusted, t }: { sources: ScoredSource[]; trusted: string[]; t: T }) {
   const sorted = [...sources].sort((a, b) => Number(trusted.includes(b.source.id)) - Number(trusted.includes(a.source.id)) || b.score - a.score);
   return (
     <div className="rounded-2xl border border-line bg-panel p-4">
       <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-3">
-        <FileText size={14} /> {sources.length} sources found · {trusted.length} trusted
+        <FileText size={14} /> {t("sourcesFound", { n: sources.length, m: trusted.length })}
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         {sorted.map((s, i) => {
@@ -423,12 +450,12 @@ function SourcesCard({ sources, trusted }: { sources: ScoredSource[]; trusted: s
                 <div className="min-w-0">
                   <div className="text-sm font-medium leading-snug">{s.source.title}</div>
                   <div className="mt-0.5 truncate text-[11px] text-ink-3">
-                    {TYPE_LABEL[s.source.type]} · {s.source.location}
+                    {t(`type.${s.source.type}`)} · {s.source.location}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="font-mono text-sm tabular-nums">{s.score}</div>
-                  <div className="text-[10px] text-ink-3">{isTrusted ? "trusted" : "set aside"}</div>
+                  <div className="text-[10px] text-ink-3">{isTrusted ? t("trusted") : t("setAside")}</div>
                 </div>
               </div>
               <div className="mt-2 h-1 overflow-hidden rounded-full bg-line">

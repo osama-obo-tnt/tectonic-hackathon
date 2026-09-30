@@ -3,27 +3,23 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Headphones, Loader2, Pause, Play, Radio } from "lucide-react";
 import { useState } from "react";
 import { AGENT_META } from "@/lib/agentMeta";
+import type { T } from "@/lib/i18n";
 import type { ScoredSource, Turn } from "@/lib/types";
 import { AgentAvatar, Equalizer } from "./bits";
 import type { useVoice } from "./useVoice";
-
-const STAGE_LABEL: Record<Turn["stage"], string> = {
-  present: "presents the evidence",
-  challenge: "challenges",
-  rebuttal: "responds",
-  verdict: "rules",
-};
 
 export function DebatePanel({
   turns,
   sources,
   voice,
   voiceEnabled,
+  t: tr,
 }: {
   turns: Turn[];
   sources: ScoredSource[];
   voice: ReturnType<typeof useVoice>;
   voiceEnabled: boolean;
+  t: T;
 }) {
   const [open, setOpen] = useState<number | null>(null);
   const [podcast, setPodcast] = useState<{ state: "idle" | "loading" | "ready" | "error"; url?: string }>({ state: "idle" });
@@ -54,7 +50,7 @@ export function DebatePanel({
           className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-medium hover:bg-white/15"
         >
           {debatePlaying ? <Pause size={16} /> : <Headphones size={16} />}
-          {debatePlaying ? "Stop" : "Listen to the debate"}
+          {debatePlaying ? tr("stop") : tr("listenDebate")}
         </button>
         {voiceEnabled && (
           <button
@@ -64,11 +60,11 @@ export function DebatePanel({
             title="Render the whole debate as one natural multi-voice conversation (ElevenLabs v3 dialogue)"
           >
             {podcast.state === "loading" ? <Loader2 size={16} className="animate-spin" /> : <Radio size={16} />}
-            {podcast.state === "loading" ? "Producing podcast…" : "Debate podcast (Eleven v3)"}
+            {podcast.state === "loading" ? tr("producingPodcast") : tr("podcast")}
           </button>
         )}
         {podcast.state === "ready" && podcast.url && <audio src={podcast.url} controls autoPlay className="h-9" />}
-        {podcast.state === "error" && <span className="text-xs text-bad">Podcast unavailable: use “Listen” instead.</span>}
+        {podcast.state === "error" && <span className="text-xs text-bad">{tr("podcastError")}</span>}
       </div>
 
       <ol className="relative space-y-4 before:absolute before:left-5 before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-line">
@@ -95,7 +91,7 @@ export function DebatePanel({
                     {meta.name}
                   </span>
                   <span className="text-ink-3">
-                    {meta.role} · {STAGE_LABEL[t.stage]}
+                    {tr(`role.${t.agent}`)} · {tr(`turn.${t.stage}`)}
                   </span>
                   {speaking && <Equalizer color={meta.color} />}
                   {loading && <Loader2 size={12} className="animate-spin text-ink-3" />}
@@ -115,7 +111,7 @@ export function DebatePanel({
                     aria-expanded={open === i}
                   >
                     <ChevronDown size={14} className={`transition-transform ${open === i ? "rotate-180" : ""}`} />
-                    Reasoning & sources
+                    {tr("reasoningSources")}
                   </button>
                 )}
                 <AnimatePresence>
