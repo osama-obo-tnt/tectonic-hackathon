@@ -9,7 +9,6 @@ import { AgentAvatar, SignalChip, TrustGauge, VERDICT } from "./bits";
 import { DebatePanel } from "./DebatePanel";
 import { ExpertCard } from "./ExpertCard";
 import { useVoice } from "./useVoice";
-import { VoiceInput } from "./VoiceInput";
 
 export function AskView({
   clients,
@@ -162,7 +161,6 @@ export function AskView({
           <option value="nl">NL</option>
           <option value="fr">FR</option>
         </select>
-        <VoiceInput elevenEnabled={voiceEnabled} language={language} onText={(t) => ask(t)} />
         <button
           type="submit"
           disabled={running || question.trim().length < 5}
