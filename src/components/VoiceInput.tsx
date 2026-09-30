@@ -1,6 +1,7 @@
 "use client";
 import { Loader2, Mic, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { diag } from "./diag";
 
 // Minimal typing for the browser Web Speech API (not in TypeScript's DOM lib).
 interface Recognition {
@@ -24,6 +25,7 @@ const LANG: Record<string, string> = { en: "en-GB", nl: "nl-BE", fr: "fr-BE" };
 
 function micError(e: unknown) {
   const name = e instanceof DOMException ? e.name : "";
+  diag("mic-getusermedia-failed", `${name}: ${e instanceof Error ? e.message : e}`);
   if (name === "NotAllowedError") return "Microphone blocked. Allow it via the icon in the address bar, then try again.";
   if (name === "NotFoundError") return "No microphone found on this device.";
   return "Microphone not available in this browser.";
@@ -54,7 +56,7 @@ export function VoiceInput({ onText, elevenEnabled, language }: { onText: (text:
       const text = e.results[0]?.[0]?.transcript?.trim();
       if (text) onText(text);
     };
-    rec.onerror = (e) => setError(e.error === "not-allowed" ? "Microphone blocked. Allow it via the icon in the address bar." : `Speech recognition error: ${e.error}`);
+    rec.onerror = (e) => (diag("browser-stt-error", e.error), setError(e.error === "not-allowed" ? "Microphone blocked. Allow it via the icon in the address bar." : `Speech recognition error: ${e.error}`));
     rec.onend = () => setState("idle");
     recognition.current = rec;
     rec.start();
@@ -62,6 +64,7 @@ export function VoiceInput({ onText, elevenEnabled, language }: { onText: (text:
   }
 
   async function startEleven() {
+    diag("mic-start", `mode=eleven mediaDevices=${Boolean(navigator.mediaDevices?.getUserMedia)} recorder=${typeof MediaRecorder}`);
     if (!navigator.mediaDevices?.getUserMedia) return setError("Microphone needs http://localhost or https.");
     let stream: MediaStream;
     try {
@@ -79,6 +82,7 @@ export function VoiceInput({ onText, elevenEnabled, language }: { onText: (text:
       form.append("audio", new Blob(chunks, { type: (rec.mimeType || "audio/webm").split(";")[0] }), "question.webm");
       const res = await fetch("/api/stt", { method: "POST", body: form }).catch(() => null);
       const data = res?.ok ? ((await res.json()) as { text: string }) : null;
+      diag("mic-transcribed", `status=${res?.status} chunks=${chunks.length} bytes=${chunks.reduce((a, c) => a + c.size, 0)} type=${rec.mimeType} text=${data?.text ?? ""}`);
       setState("idle");
       if (data?.text) return onText(data.text);
       if (browserRecognition()) {

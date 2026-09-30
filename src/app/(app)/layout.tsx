@@ -46,7 +46,7 @@ function Logo() {
         <div className="brand-bars h-6 w-1.5 rounded-full" />
         <span className="text-lg font-bold tracking-tight">TrustLens</span>
       </div>
-      <div className="mt-0.5 pl-3.5 text-[11px] text-ink-3">for SD Worx · Find it. Understand it. Trust it.</div>
+      <div className="mt-0.5 whitespace-nowrap pl-3.5 text-[10.5px] text-ink-3">for SDWorx · Find it. Understand it. Trust it.</div>
     </div>
   );
 }

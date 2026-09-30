@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Building2, ChevronDown, FileText, GitCompareArrows, Headphones, Loader2, Pause, SearchX, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronDown, FileText, GitCompareArrows, Headphones, Loader2, Pause, SearchX, Sparkles } from "lucide-react";
 import { useRef, useState } from "react";
 import { AGENT_META, STAGE_TEXT } from "@/lib/agentMeta";
 import type { AgentId, AskEvent, AskResult, Client, Conflict, Language, ScoredSource, Turn } from "@/lib/types";
@@ -42,6 +42,7 @@ export function AskView({
   const [result, setResult] = useState<AskResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showReasoning, setShowReasoning] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const voice = useVoice(language);
   const reasoningRef = useRef<HTMLDivElement>(null);
   const running = stage !== null && !result && !error;
@@ -59,6 +60,7 @@ export function AskView({
     setResult(null);
     setError(null);
     setShowReasoning(false);
+    setShowDetails(false);
 
     try {
       const res = await fetch("/api/ask", {
@@ -101,122 +103,159 @@ export function AskView({
   const answerPlaying = voice.playingId === "answer" || voice.loadingId === "answer";
   const activeAgent: AgentId | null =
     stage === "scout" || stage === "rebuttal" ? "scout" : stage === "critic" ? "critic" : stage === "arbiter" ? "arbiter" : null;
+  const lastTurn = turns.at(-1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* ─── Question ─── */}
-      <section className="rounded-2xl border border-line bg-panel/80 p-5 backdrop-blur">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-xs font-semibold uppercase tracking-wider text-ink-3">Client</span>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          ask();
+        }}
+        className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-panel p-2"
+      >
+        <select
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          className="h-11 rounded-xl bg-panel-2 px-3 text-sm text-ink outline-none"
+          aria-label="Client"
+        >
           {clients.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setClientId(c.id)}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${
-                c.id === clientId ? "border-brand bg-brand/15 text-ink" : "border-line text-ink-2 hover:border-ink-3"
-              }`}
-            >
-              <Building2 size={12} /> {c.name}
-              <span className="text-ink-3">
-                {c.country}
-                {c.jointCommittee ? ` · ${c.jointCommittee}` : ""}
-              </span>
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value.slice(0, 500))}
+          placeholder="Ask a question…"
+          className="h-11 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-ink-3"
+        />
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value as Language)}
+          className="h-11 rounded-xl bg-transparent px-1 text-xs text-ink-3 outline-none"
+          aria-label="Answer language"
+        >
+          <option value="en">EN</option>
+          <option value="nl">NL</option>
+          <option value="fr">FR</option>
+        </select>
+        <VoiceInput elevenEnabled={voiceEnabled} language={language} onText={(t) => ask(t)} />
+        <button
+          type="submit"
+          disabled={running || question.trim().length < 5}
+          className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold transition hover:brightness-110 disabled:opacity-40"
+        >
+          {running ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Ask
+        </button>
+      </form>
+
+      {!stage && examples.length > 0 && (
+        <div className="space-y-1.5 pl-1">
+          <p className="text-xs text-ink-3">Try one of these:</p>
+          {examples.map((ex) => (
+            <button key={ex.question} onClick={() => ask(ex.question, ex.clientId)} className="block text-left text-sm text-ink-2 transition hover:text-ink">
+              → {ex.question} <span className="text-xs text-ink-3">· {clients.find((c) => c.id === ex.clientId)?.name}</span>
             </button>
           ))}
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as Language)}
-            className="ml-auto rounded-lg border border-line bg-panel-2 px-2 py-1 text-xs text-ink-2"
-            aria-label="Answer language"
-          >
-            <option value="en">English</option>
-            <option value="nl">Nederlands</option>
-            <option value="fr">Français</option>
-          </select>
+          <p className="pt-3 text-xs text-ink-3">
+            {engine === "claude" ? "Agents powered by Claude" : "Demo agents"} · {voiceEnabled ? "voices by ElevenLabs" : "browser voices"}
+          </p>
         </div>
-        {client?.note && <p className="mb-3 text-xs text-warn">⚑ {client.note}</p>}
+      )}
+      {client?.note && !result && <p className="pl-1 text-xs text-warn">⚑ {client.note}</p>}
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            ask();
-          }}
-          className="flex items-center gap-2"
-        >
-          <input
-            value={question}
-            onChange={(e) => setQuestion(e.target.value.slice(0, 500))}
-            placeholder={`Ask anything about ${client?.name ?? "your client"}…`}
-            className="h-11 flex-1 rounded-xl border border-line bg-panel-2 px-4 text-sm outline-none placeholder:text-ink-3 focus:border-brand"
-          />
-          <VoiceInput elevenEnabled={voiceEnabled} language={language} onText={(t) => ask(t)} />
-          <button
-            type="submit"
-            disabled={running || question.trim().length < 5}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold transition hover:brightness-110 disabled:opacity-50"
-          >
-            {running ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Ask
-          </button>
-        </form>
-
-        {examples.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {examples.map((ex) => (
-              <button
-                key={ex.question}
-                onClick={() => ask(ex.question, ex.clientId)}
-                disabled={running}
-                className="rounded-lg bg-white/5 px-3 py-1.5 text-left text-xs text-ink-2 transition hover:bg-white/10 disabled:opacity-50"
-              >
-                {ex.question}
-              </button>
+      {/* ─── Live agents: one compact row ─── */}
+      {running && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-4 rounded-2xl border border-line bg-panel p-4">
+          <div className="flex gap-2">
+            {(Object.keys(AGENT_META) as AgentId[]).map((a) => (
+              <div key={a} className={`transition-opacity ${activeAgent === a ? "opacity-100" : "opacity-35"}`}>
+                <AgentAvatar agent={a} size={34} active={activeAgent === a} />
+              </div>
             ))}
           </div>
-        )}
-      </section>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-ink">{STAGE_TEXT[stage!]}</p>
+            {lastTurn && (
+              <p className="mt-0.5 truncate text-xs text-ink-3">
+                {AGENT_META[lastTurn.agent].name}: “{lastTurn.text}”
+              </p>
+            )}
+          </div>
+          <Loader2 size={16} className="animate-spin text-ink-3" />
+        </motion.div>
+      )}
+      {error && <p className="rounded-xl border border-bad/50 bg-bad/10 p-3 text-sm">{error}</p>}
 
-      {/* ─── Live agents ─── */}
+      {/* ─── Result ─── */}
       <AnimatePresence>
-        {stage && (
-          <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="grid gap-3 sm:grid-cols-3">
-            {(Object.keys(AGENT_META) as AgentId[]).map((a) => {
-              const meta = AGENT_META[a];
-              const said = turns.filter((t) => t.agent === a).at(-1);
-              const thinking = running && activeAgent === a;
-              return (
-                <div
-                  key={a}
-                  className="relative overflow-hidden rounded-2xl border bg-panel p-4 transition-colors"
-                  style={{ borderColor: thinking ? meta.color : "var(--line)" }}
-                >
-                  {thinking && <div className="shimmer absolute inset-0" />}
-                  <div className="relative flex items-center gap-3">
-                    <AgentAvatar agent={a} active={thinking} size={36} />
-                    <div>
-                      <div className="text-sm font-semibold" style={{ color: meta.color }}>
-                        {meta.name}
-                      </div>
-                      <div className="text-xs text-ink-3">
-                        {meta.role} · {meta.tagline}
-                      </div>
+        {result && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <AnswerCard
+              result={result}
+              playing={answerPlaying}
+              onListen={() => (answerPlaying ? voice.stop() : voice.speak([{ id: "answer", text: result.answer, voice: "narrator" }]))}
+              onReasoning={openReasoning}
+            />
+
+            {result.verdict !== "trusted" && result.expert && (
+              <div className="grid gap-4 md:grid-cols-2">
+                {result.gaps.length > 0 && (
+                  <div className="rounded-2xl border border-warn/40 bg-warn/5 p-4">
+                    <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-warn">
+                      <SearchX size={14} /> Knowledge gap
                     </div>
+                    {result.gaps.map((g) => (
+                      <p key={g} className="text-sm text-ink-2">
+                        {g}
+                      </p>
+                    ))}
                   </div>
-                  <p className="relative mt-3 line-clamp-3 min-h-[3.75rem] text-xs leading-relaxed text-ink-2">
-                    {thinking ? STAGE_TEXT[stage!] : said ? `“${said.text}”` : running ? "Waiting for their turn…" : "—"}
-                  </p>
+                )}
+                <ExpertCard key={result.question + result.clientId} result={result} />
+              </div>
+            )}
+
+            <Section
+              innerRef={reasoningRef}
+              open={showReasoning}
+              onToggle={() => setShowReasoning((s) => !s)}
+              icon={
+                <div className="flex -space-x-2">
+                  {(Object.keys(AGENT_META) as AgentId[]).map((a) => (
+                    <AgentAvatar key={a} agent={a} size={24} />
+                  ))}
                 </div>
-              );
-            })}
-          </motion.section>
+              }
+              title="Why is this reliable?"
+              subtitle="Read or listen to Nova, Rex and Sage debate it"
+            >
+              <p className="mb-4 text-xs text-ink-3">
+                {result.scoreExplanation.join(" ")} Score = scope 35% · freshness 25% · validation 25% · ownership 15%, computed from the sources, not by the AI.
+              </p>
+              <DebatePanel turns={result.turns} sources={result.sources} voice={voice} voiceEnabled={voiceEnabled} />
+            </Section>
+
+            <Section
+              open={showDetails}
+              onToggle={() => setShowDetails((s) => !s)}
+              icon={<FileText size={18} className="text-ink-3" />}
+              title={`${sources.length} sources checked · ${result.trustedSourceIds.length} trusted`}
+              subtitle={conflicts.length ? `${conflicts.length} conflict${conflicts.length > 1 ? "s" : ""} resolved` : "No conflicts"}
+            >
+              <div className="space-y-4">
+                {conflicts.length > 0 && <ConflictsCard conflicts={conflicts} sources={sources} />}
+                <SourcesCard sources={sources} trusted={result.trustedSourceIds} />
+              </div>
+            </Section>
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {running && stage === "retrieving" && (
-        <p className="flex items-center gap-2 text-sm text-ink-3">
-          <Loader2 size={14} className="animate-spin" /> {STAGE_TEXT.retrieving}
-        </p>
-      )}
-      {error && <p className="rounded-xl border border-bad/50 bg-bad/10 p-3 text-sm">{error}</p>}
       {/* Always mounted so the audio element exists before the first click (autoplay unlock). */}
       <div
         className={`fixed inset-x-0 bottom-0 z-40 border-t border-line bg-panel/95 px-4 py-2 backdrop-blur transition ${voice.current ? "translate-y-0" : "pointer-events-none translate-y-full opacity-0"}`}
@@ -246,109 +285,44 @@ export function AskView({
           🔇 {voice.error}
         </p>
       )}
+    </div>
+  );
+}
 
-      {/* ─── Result ─── */}
+function Section({
+  open,
+  onToggle,
+  icon,
+  title,
+  subtitle,
+  children,
+  innerRef,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  innerRef?: React.Ref<HTMLDivElement>;
+}) {
+  return (
+    <div ref={innerRef} className="scroll-mt-4 rounded-2xl border border-line bg-panel">
+      <button onClick={onToggle} className="flex w-full items-center gap-3 p-4 text-left" aria-expanded={open}>
+        {icon}
+        <div className="flex-1">
+          <div className="text-sm font-semibold">{title}</div>
+          <div className="text-xs text-ink-3">{subtitle}</div>
+        </div>
+        <ChevronDown className={`text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
       <AnimatePresence>
-        {result && (
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="grid gap-6 lg:grid-cols-[1fr_320px]">
-            <div className="space-y-6">
-              <AnswerCard
-                result={result}
-                playing={answerPlaying}
-                onListen={() => (answerPlaying ? voice.stop() : voice.speak([{ id: "answer", text: result.answer, voice: "narrator" }]))}
-                onReasoning={openReasoning}
-              />
-
-              <div ref={reasoningRef} className="scroll-mt-4 rounded-2xl border border-line bg-panel">
-                <button
-                  onClick={() => setShowReasoning((s) => !s)}
-                  className="flex w-full items-center gap-3 p-4 text-left"
-                  aria-expanded={showReasoning}
-                >
-                  <div className="flex -space-x-2">
-                    {(Object.keys(AGENT_META) as AgentId[]).map((a) => (
-                      <AgentAvatar key={a} agent={a} size={28} />
-                    ))}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold">Why is this reliable? The full chain of reasoning</div>
-                    <div className="text-xs text-ink-3">Nova, Rex and Sage debated {result.sources.length} sources. Read it or listen to it.</div>
-                  </div>
-                  <ChevronDown className={`text-ink-3 transition-transform ${showReasoning ? "rotate-180" : ""}`} />
-                </button>
-                <AnimatePresence>
-                  {showReasoning && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                      <div className="border-t border-line p-4">
-                        <div className="mb-5 rounded-xl bg-panel-2 p-3">
-                          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-ink-3">How the score was computed</div>
-                          <ul className="space-y-1 text-sm text-ink-2">
-                            {result.scoreExplanation.map((e) => (
-                              <li key={e}>• {e}</li>
-                            ))}
-                          </ul>
-                          <p className="mt-2 text-[11px] text-ink-3">
-                            The score comes from transparent signals (scope 35%, freshness 25%, validation 25%, ownership 15%), not from the AI. The agents explain it.
-                          </p>
-                        </div>
-                        <DebatePanel turns={result.turns} sources={result.sources} voice={voice} voiceEnabled={voiceEnabled} />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {conflicts.length > 0 && <ConflictsCard conflicts={conflicts} sources={sources} />}
-              <SourcesCard sources={sources} trusted={result.trustedSourceIds} />
-            </div>
-
-            <aside className="space-y-4">
-              {result.gaps.length > 0 && (
-                <div className="rounded-2xl border border-warn/40 bg-warn/5 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-warn">
-                    <SearchX size={14} /> Knowledge gap
-                  </div>
-                  {result.gaps.map((g) => (
-                    <p key={g} className="text-sm text-ink-2">
-                      {g}
-                    </p>
-                  ))}
-                </div>
-              )}
-              <ExpertCard key={result.question + result.clientId} result={result} />
-              <div className="rounded-2xl border border-line bg-panel p-4 text-xs text-ink-3">
-                Engine: <span className="text-ink-2">{result.engine === "claude" ? "Claude agents (Anthropic)" : "Built-in demo agents"}</span>
-                <br />
-                Voice: <span className="text-ink-2">{voiceEnabled ? "ElevenLabs" : "Browser fallback"}</span>
-              </div>
-            </aside>
+        {open && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="border-t border-line p-4">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {!stage && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {(Object.keys(AGENT_META) as AgentId[]).map((a, i) => (
-            <motion.div
-              key={a}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 * i }}
-              className="rounded-2xl border border-line bg-panel/70 p-4"
-            >
-              <AgentAvatar agent={a} size={36} />
-              <div className="mt-3 text-sm font-semibold" style={{ color: AGENT_META[a].color }}>
-                {AGENT_META[a].name} · {AGENT_META[a].role}
-              </div>
-              <p className="text-xs text-ink-3">{AGENT_META[a].tagline}</p>
-            </motion.div>
-          ))}
-          <p className="text-xs text-ink-3 sm:col-span-3">
-            {engine === "claude" ? "Agents are powered by Claude." : "Running built-in demo agents. Add an Anthropic API key for live reasoning."}{" "}
-            {voiceEnabled ? "Voices are powered by ElevenLabs." : "Add an ElevenLabs key for real agent voices."}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

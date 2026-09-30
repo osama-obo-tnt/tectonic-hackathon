@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runPipeline } from "@/lib/agents";
 import { requireApiUser } from "@/lib/auth";
 import { rateLimit } from "@/lib/ratelimit";
-import { getClient } from "@/lib/store";
+import { getClient, saveAnalysis } from "@/lib/store";
 import type { AskEvent } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       const emit = (e: AskEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(e)}\n`));
       try {
-        await runPipeline(parsed.data.question, client, user, parsed.data.language, emit);
+        const result = await runPipeline(parsed.data.question, client, user, parsed.data.language, emit);
+        saveAnalysis(user.id, result);
       } catch (err) {
         console.error("ask pipeline error", err);
         emit({ type: "error", message: "Something went wrong while analysing the sources." });

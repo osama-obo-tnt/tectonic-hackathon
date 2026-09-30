@@ -12,12 +12,8 @@ export default async function AskPage() {
   return (
     <div>
       <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-          Good to see you, {user.name.split(" ")[0]}. <span className="text-ink-3">What do you need to be sure about?</span>
-        </h1>
-        <p className="mt-1 text-sm text-ink-3">
-          TrustLens searches every knowledge source, lets three AI agents debate what holds up, and shows you exactly why you can (or can&apos;t) rely on it.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">Hi {user.name.split(" ")[0]}, what do you need to be sure about?</h1>
+        <p className="mt-1 text-sm text-ink-3">Three AI agents check every source and tell you what you can trust, and why.</p>
       </header>
       <AskView clients={clients} examples={examples} voiceEnabled={elevenEnabled()} engine={llmEnabled() ? "claude" : "demo"} />
     </div>

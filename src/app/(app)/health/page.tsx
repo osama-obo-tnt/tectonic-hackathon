@@ -1,8 +1,9 @@
 import { GitCompareArrows, UserX } from "lucide-react";
-import { claimLabels, topicLabels } from "@/data/knowledge";
+import { claimLabels } from "@/data/knowledge";
 import { IssueBars, StatTile } from "@/components/HealthCharts";
+import { ReasoningGraph } from "@/components/ReasoningGraph";
 import { requirePageUser } from "@/lib/auth";
-import { personActive, personName, sourcesForUser } from "@/lib/store";
+import { analysesFor, personActive, personName, sourcesForUser } from "@/lib/store";
 import { scoreSource } from "@/lib/trust";
 import type { Client } from "@/lib/types";
 
@@ -41,26 +42,21 @@ export default async function HealthPage() {
     .map(([k, v]) => ({ key: k, label: claimLabels[k.split("|")[0]] ?? k, country: k.split("|")[1], positions: v.sort((a, b) => b.score - a.score) }));
 
   const healthy = scored.filter((s) => s.score >= 75).length;
-  const topics = Object.keys(topicLabels).map((t) => {
-    const list = scored.filter((s) => s.source.topic === t);
-    return {
-      t,
-      count: list.length,
-      avg: list.length ? Math.round(list.reduce((a, s) => a + s.score, 0) / list.length) : 0,
-      conflicts: conflicts.filter((c) => list.some((s) => s.source.claims.some((cl) => cl.key === c.key.split("|")[0]))).length,
-    };
-  });
   const orphanOwners = [...new Set(orphaned.map((s) => s.source.ownerId))].filter((id) => id && !personActive(id));
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Knowledge health</h1>
-        <p className="mt-1 text-sm text-ink-3">
-          Conflicting, outdated, ownerless and unvalidated knowledge, made visible before it reaches a client.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">Knowledge health</h1>
+        <p className="mt-1 text-sm text-ink-3">See how the agents reasoned, and where SD Worx knowledge needs fixing.</p>
       </header>
 
+      <section>
+        <h2 className="mb-2 text-sm font-semibold">Reasoning map · your recent questions</h2>
+        <ReasoningGraph analyses={analysesFor(user.id)} />
+      </section>
+
+      <h2 className="pt-2 text-sm font-semibold">Knowledge base health</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatTile label="Sources analysed" value={scored.length} sub={`${healthy} healthy (trust ≥ 75)`} tone="good" />
         <StatTile label="Contradictions" value={conflicts.length} sub="claims that disagree" tone="bad" />
@@ -69,7 +65,7 @@ export default async function HealthPage() {
         <StatTile label="Not validated" value={unvalidated.length} sub="chat, email, unreviewed docs" tone="warn" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6">
         <section className="rounded-2xl border border-line bg-panel p-5">
           <h2 className="mb-1 text-sm font-semibold">Share of sources affected per issue</h2>
           <p className="mb-4 text-xs text-ink-3">Hover a bar for what it means. A source can have several issues.</p>
@@ -84,29 +80,6 @@ export default async function HealthPage() {
           />
         </section>
 
-        <section className="rounded-2xl border border-line bg-panel p-5">
-          <h2 className="mb-4 text-sm font-semibold">Health by topic</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-ink-3">
-                <th className="pb-2 font-normal">Topic</th>
-                <th className="pb-2 text-right font-normal">Sources</th>
-                <th className="pb-2 text-right font-normal">Avg. trust</th>
-                <th className="pb-2 text-right font-normal">Conflicts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topics.map((t) => (
-                <tr key={t.t} className="border-t border-line">
-                  <td className="py-2">{topicLabels[t.t]}</td>
-                  <td className="py-2 text-right tabular-nums text-ink-2">{t.count}</td>
-                  <td className="py-2 text-right tabular-nums text-ink-2">{t.avg}</td>
-                  <td className="py-2 text-right tabular-nums text-ink-2">{t.conflicts}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
       </div>
 
       <section className="rounded-2xl border border-line bg-panel p-5">

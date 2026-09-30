@@ -3,13 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { clients, experts, people, sources as seedSources, users } from "@/data/knowledge";
-import type { ExpertQuestion, Source, User } from "./types";
+import type { AskResult, ExpertQuestion, Source, User } from "./types";
 
 // Small file-backed store for the data that changes at runtime:
 // questions routed to experts and the knowledge captured from their answers.
 interface StoreShape {
   questions: ExpertQuestion[];
   captured: Source[];
+  analyses: Record<string, AskResult[]>; // per user id, most recent first
 }
 
 const STORE_DIR = path.join(process.cwd(), ".data");
@@ -19,9 +20,9 @@ function load(): StoreShape {
   try {
     const raw = fs.readFileSync(STORE_FILE, "utf8");
     const parsed = JSON.parse(raw) as StoreShape;
-    return { questions: parsed.questions ?? [], captured: parsed.captured ?? [] };
+    return { questions: parsed.questions ?? [], captured: parsed.captured ?? [], analyses: parsed.analyses ?? {} };
   } catch {
-    return { questions: [], captured: [] };
+    return { questions: [], captured: [], analyses: {} };
   }
 }
 
@@ -141,4 +142,18 @@ export function answerQuestion(questionId: string, expertId: string, answer: str
   data.captured.push(captured);
   save(data);
   return { question, captured };
+}
+
+const MAX_ANALYSES = 6;
+
+/** Keeps a user's most recent analyses so the reasoning map can show them. Private per user. */
+export function saveAnalysis(userId: string, result: AskResult) {
+  const data = load();
+  const list = (data.analyses[userId] ?? []).filter((r) => !(r.question === result.question && r.clientId === result.clientId));
+  data.analyses[userId] = [result, ...list].slice(0, MAX_ANALYSES);
+  save(data);
+}
+
+export function analysesFor(userId: string): AskResult[] {
+  return load().analyses[userId] ?? [];
 }
