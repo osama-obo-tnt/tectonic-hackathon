@@ -5,7 +5,7 @@ const API = "https://api.elevenlabs.io/v1";
 
 // Each speaker gets a distinct premade ElevenLabs voice (override via env).
 export const VOICES = {
-  narrator: process.env.ELEVENLABS_VOICE_NARRATOR ?? "Xb7hH8MSUJpSbSDYk0k2", // Alice: clear and calm
+  narrator: process.env.ELEVENLABS_VOICE_NARRATOR ?? "nPczCjzI2devNBz1zQrb", // Brian: deep, calm male narrator
   scout: process.env.ELEVENLABS_VOICE_SCOUT ?? "cgSgspJ2msm6clMCkdW9", // Jessica: bright and curious
   critic: process.env.ELEVENLABS_VOICE_CRITIC ?? "N2lVS1w4EtoT3dr4eOWO", // Callum: gritty and sceptical
   arbiter: process.env.ELEVENLABS_VOICE_ARBITER ?? "onwK4e9ZLuTAKqWW03F9", // Daniel: measured, authoritative
