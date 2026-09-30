@@ -16,8 +16,14 @@ function getClient(): GoogleGenAI | null {
   return client;
 }
 
+// After a failure (e.g. model blocked by org policy) skip Gemini for a while so questions stay fast.
+let pausedUntil = 0;
+export function pauseGemini(ms = 5 * 60_000) {
+  pausedUntil = Date.now() + ms;
+}
+
 export function geminiEnabled() {
-  return getClient() !== null;
+  return getClient() !== null && Date.now() > pausedUntil;
 }
 
 export async function generateJson<T>(system: string, prompt: string, schema: object): Promise<T> {

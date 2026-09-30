@@ -1,6 +1,6 @@
 import "server-only";
 import { demoAnswers, topicLabels } from "@/data/knowledge";
-import { generateJson, geminiEnabled } from "./gemini";
+import { generateJson, geminiEnabled, pauseGemini } from "./gemini";
 import { sourcesForUser } from "./store";
 import { detectConflicts, detectGaps, overallTrust, retrieve, scoreSource, suggestExpert } from "./trust";
 import type { AskEvent, AskResult, Client, Conflict, Language, ScoredSource, Turn, User } from "./types";
@@ -282,7 +282,8 @@ Known gaps: ${gaps.length ? gaps.join(" | ") : "none"}`;
       answer = arbiter.finalAnswer;
       engine = "gemini";
     } catch (err) {
-      console.error("Gemini pipeline failed, falling back to demo engine:", err instanceof Error ? err.message : err);
+      console.error("Gemini pipeline failed, falling back to demo engine:", err instanceof Error ? err.message.slice(0, 300) : err);
+      pauseGemini();
       turns = [];
     }
   }
