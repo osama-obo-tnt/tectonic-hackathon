@@ -149,7 +149,7 @@ export function AskView({
             placeholder={`Ask anything about ${client?.name ?? "your client"}…`}
             className="h-11 flex-1 rounded-xl border border-line bg-panel-2 px-4 text-sm outline-none placeholder:text-ink-3 focus:border-brand"
           />
-          <VoiceInput enabled={voiceEnabled} onText={(t) => ask(t)} />
+          <VoiceInput elevenEnabled={voiceEnabled} language={language} onText={(t) => ask(t)} />
           <button
             type="submit"
             disabled={running || question.trim().length < 5}
@@ -217,6 +217,11 @@ export function AskView({
         </p>
       )}
       {error && <p className="rounded-xl border border-bad/50 bg-bad/10 p-3 text-sm">{error}</p>}
+      {voice.error && (
+        <p role="alert" className="fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border border-warn/50 bg-panel-2 p-3 text-sm text-ink-2 shadow-2xl">
+          🔇 {voice.error}
+        </p>
+      )}
 
       {/* ─── Result ─── */}
       <AnimatePresence>

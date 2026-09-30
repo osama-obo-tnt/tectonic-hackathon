@@ -8,15 +8,19 @@ export interface SpeakItem {
   voice: VoiceName;
 }
 
-// Browser voice fallback, used when ElevenLabs is not configured: pitch/rate make each agent distinct.
+// Browser voice fallback, used when ElevenLabs is unavailable: pitch/rate make each agent distinct.
 const FALLBACK: Record<VoiceName, { pitch: number; rate: number }> = {
-  narrator: { pitch: 1, rate: 1 },
+  narrator: { pitch: 0.85, rate: 1 },
   scout: { pitch: 1.25, rate: 1.05 },
   critic: { pitch: 0.75, rate: 1.02 },
   arbiter: { pitch: 0.9, rate: 0.92 },
 };
 
 const LANG: Record<string, string> = { en: "en-GB", nl: "nl-BE", fr: "fr-BE" };
+
+// 0.1s of silence. Playing it inside the click "unlocks" the audio element, so browsers
+// that block sound started after an await (Firefox, Safari, Brave) still play the voices.
+const SILENCE = "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
 
 async function fetchAudio(item: SpeakItem, signal: AbortSignal): Promise<string | null> {
   const res = await fetch("/api/tts", {
@@ -33,6 +37,7 @@ async function fetchAudio(item: SpeakItem, signal: AbortSignal): Promise<string 
 export function useVoice(language = "en") {
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const urls = useRef<string[]>([]);
@@ -41,7 +46,6 @@ export function useVoice(language = "en") {
     abortRef.current?.abort();
     abortRef.current = null;
     audioRef.current?.pause();
-    audioRef.current = null;
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     setPlayingId(null);
     setLoadingId(null);
@@ -54,6 +58,15 @@ export function useVoice(language = "en") {
     },
     [stop],
   );
+
+  /** Must run synchronously inside the click handler. */
+  function unlock() {
+    if (!audioRef.current) audioRef.current = new Audio();
+    const el = audioRef.current;
+    el.src = SILENCE;
+    el.play().catch(() => {});
+    if ("speechSynthesis" in window) window.speechSynthesis.resume();
+  }
 
   const playFallback = (item: SpeakItem, signal: AbortSignal) =>
     new Promise<void>((resolve) => {
@@ -69,18 +82,29 @@ export function useVoice(language = "en") {
     });
 
   const playUrl = (url: string, signal: AbortSignal) =>
-    new Promise<void>((resolve) => {
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      signal.addEventListener("abort", () => resolve());
-      audio.play().catch(() => resolve());
+    new Promise<boolean>((resolve) => {
+      const el = audioRef.current ?? new Audio();
+      audioRef.current = el;
+      el.onended = () => resolve(true);
+      el.onerror = () => resolve(false);
+      signal.addEventListener("abort", () => resolve(true));
+      el.src = url;
+      el.play().catch((e: unknown) => {
+        const name = e instanceof DOMException ? e.name : "";
+        setError(
+          name === "NotAllowedError"
+            ? "Your browser blocked audio. Allow sound for localhost (site settings) and click Listen again."
+            : "Could not play audio in this browser.",
+        );
+        resolve(false);
+      });
     });
 
   const speak = useCallback(
     async (items: SpeakItem[]) => {
       stop();
+      unlock();
+      setError(null);
       const controller = new AbortController();
       abortRef.current = controller;
       const { signal } = controller;
@@ -96,12 +120,12 @@ export function useVoice(language = "en") {
         if (signal.aborted) return;
         setLoadingId(null);
         setPlayingId(item.id);
+        let played = false;
         if (url) {
           urls.current.push(url);
-          await playUrl(url, signal);
-        } else {
-          await playFallback(item, signal);
+          played = await playUrl(url, signal);
         }
+        if (!played && !signal.aborted) await playFallback(item, signal);
       }
       if (!signal.aborted) {
         setPlayingId(null);
@@ -112,5 +136,5 @@ export function useVoice(language = "en") {
     [stop, language],
   );
 
-  return { speak, stop, playingId, loadingId, busy: playingId !== null || loadingId !== null };
+  return { speak, stop, playingId, loadingId, error, busy: playingId !== null || loadingId !== null };
 }
