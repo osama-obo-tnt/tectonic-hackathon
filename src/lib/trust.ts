@@ -90,6 +90,17 @@ export function scoreSource(s: Source, client: Client, all: Source[]): ScoredSou
   };
 }
 
+/** Scores every source in its own home scope, to judge the knowledge itself rather than one client question. */
+export function scoreInHomeContext(visible: Source[]): ScoredSource[] {
+  return visible.map((s) =>
+    scoreSource(
+      s,
+      { id: s.clientId ?? "home", name: "its own scope", country: s.countries[0], jointCommittee: s.jointCommittees?.[0] ?? null, employees: 0, sector: "" },
+      visible,
+    ),
+  );
+}
+
 // ─── Retrieval ────────────────────────────────────────────────────────────
 
 const STOP = new Set(

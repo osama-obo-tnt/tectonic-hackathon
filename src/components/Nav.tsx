@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Inbox, LogOut, MessageSquareText } from "lucide-react";
+import { Activity, Inbox, LogOut, MessageSquareText, Network } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -7,8 +7,10 @@ export function Nav({ inboxCount, isExpert }: { inboxCount: number; isExpert: bo
   const path = usePathname();
   const items = [
     { href: "/", label: "Ask TrustLens", Icon: MessageSquareText },
+    { href: "/sources", label: "Sources map", Icon: Network },
     { href: "/health", label: "Knowledge health", Icon: Activity },
-    { href: "/inbox", label: isExpert ? "Expert inbox" : "My expert questions", Icon: Inbox, count: inboxCount },
+    // Experts answer routed questions here; that is how new validated knowledge is captured.
+    ...(isExpert ? [{ href: "/inbox", label: "Expert inbox", Icon: Inbox, count: inboxCount }] : []),
   ];
   return (
     <nav className="space-y-1">

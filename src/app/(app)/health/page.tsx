@@ -4,25 +4,13 @@ import { IssueBars, StatTile } from "@/components/HealthCharts";
 import { ReasoningGraph } from "@/components/ReasoningGraph";
 import { requirePageUser } from "@/lib/auth";
 import { analysesFor, personActive, personName, sourcesForUser } from "@/lib/store";
-import { scoreSource } from "@/lib/trust";
-import type { Client } from "@/lib/types";
+import { scoreInHomeContext } from "@/lib/trust";
 
 export default async function HealthPage() {
   const user = await requirePageUser();
   const visible = sourcesForUser(user);
 
-  // Score each source in its own home context to judge the knowledge itself.
-  const scored = visible.map((s) => {
-    const home: Client = {
-      id: s.clientId ?? "home",
-      name: "its own scope",
-      country: s.countries[0],
-      jointCommittee: s.jointCommittees?.[0] ?? null,
-      employees: 0,
-      sector: "",
-    };
-    return scoreSource(s, home, visible);
-  });
+  const scored = scoreInHomeContext(visible);
   const sig = (key: string, level: string) => scored.filter((s) => s.signals.some((x) => x.key === key && x.level === level));
   const outdated = scored.filter((s) => s.signals.some((x) => x.key === "freshness" && x.level !== "good"));
   const noOwner = sig("ownership", "bad");
