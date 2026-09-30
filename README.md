@@ -2,16 +2,6 @@
 
 **Tectonic Hackathon 2026 · SD Worx challenge: "Unlock the Knowledge Within"**
 
-> **Short description:** At SD Worx, knowledge is spread across policies, SharePoint pages, Teams chats, emails, handover notes and the heads of experts. Finding an answer is easy; knowing whether it is current, owned, validated and valid for *this* client and country is not. **TrustLens** closes that gap for a payroll consultant facing an urgent client question.
->
-> It gathers every relevant source and scores each one on transparent trust signals (scope, freshness, validation and ownership). It detects where sources contradict each other and where knowledge is missing. Then three AI agents, powered by Claude, debate the evidence in front of the user: **Nova the Scout** presents what she found, **Rex the Critic** challenges outdated, ownerless or out-of-scope sources, and **Sage the Arbiter** gives the final ruling. Users can read the debate or listen to it in three distinct ElevenLabs voices.
->
-> The result is an answer with a 0–100 trust score and a clear verdict (*Trusted*, *Use with caution* or *Ask an expert*), plus a full, explainable chain of reasoning, so it is never a black box. When the knowledge isn't there, TrustLens routes the question to the right expert with all the context attached. The expert's answer is captured as validated knowledge, and the next colleague gets a trusted answer instantly. Interactive maps show where knowledge lives and where it conflicts, and results can be switched between English, Dutch and French.
-
-*Search finds answers. TrustLens tells you which one to trust, and why.*
-
----
-
 ## 1. The problem
 
 SD Worx runs payroll and HR for 100,000+ customers in 100+ countries. Its knowledge lives in policies, manuals, SharePoint, Teams channels, mailboxes, handover notes and the heads of experts.
